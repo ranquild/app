@@ -24,9 +24,13 @@ export type ServiceState = "starting" | "running" | "stopped" | "failed" | "miss
 
 export type HttpEndpoint = { kind: "http"; url: string };
 
+export type AgentCoreEndpoint = { kind: "agentcore"; runtimeArn: string; sessionId: string };
+
+export type AgentEndpoint = HttpEndpoint | AgentCoreEndpoint;
+
 export type Endpoints = {
   metabase: HttpEndpoint;
-  agent: HttpEndpoint;
+  agent: AgentEndpoint;
 };
 
 export type ProvisionedEnvironment = {

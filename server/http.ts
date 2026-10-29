@@ -128,13 +128,15 @@ export function writeEvent(res: ServerResponse, id: number, data: unknown) {
   res.write(`id: ${id}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
-export async function* readEventStream(response: Response): AsyncGenerator<{ id: string | null; data: string }> {
-  if (!response.body) {
+export async function* readEventStream(
+  body: AsyncIterable<Uint8Array> | null | undefined,
+): AsyncGenerator<{ id: string | null; data: string }> {
+  if (!body) {
     return;
   }
   const decoder = new TextDecoder();
   let buffered = "";
-  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+  for await (const chunk of body) {
     buffered += decoder.decode(chunk, { stream: true });
     let boundary = buffered.indexOf("\n\n");
     while (boundary >= 0) {

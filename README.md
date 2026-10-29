@@ -1,94 +1,87 @@
 # app
 
-Each branch of a Metabase content repo gets an **environment**: a Metabase loaded with that branch, plus a pi agent
-logged in to it. You chat with the agent in **conversations**.
+Disposable **environments** — a Metabase plus a [pi](https://pi.dev) agent logged in to it — that you chat with.
+Ask for a dashboard, the agent builds it in the environment's Metabase with the `mb` CLI, and you see it next to the
+chat.
+
+![Chat and the dashboard the agent built](docs/screenshots/environment-chat.jpg)
+
+## Architecture
 
 ```
-browser ──▶ app ──▶ provisioner ──▶ environment: metabase + agent
-             └──────────────────────────────────────────▲ agent API
+browser ──▶ app ──▶ provisioner ──▶ environment ┬─ metabase (+ app DB)
+             │                                  └─ agent server ── pi --mode rpc (one per conversation)
+             └──────── agent API ───────────────────▲
 ```
 
-- **app**: holds the settings and credentials (license, git token, warehouse credentials, model API key), the
-  environments, and every conversation's history. Serves the chat UI.
-- **provisioner**: an HTTP service that runs environments (docker first; ECS or AgentCore later). It receives
-  everything an environment needs in the spec, and reports where its services listen.
-- **agent**: an HTTP server in the environment that runs one pi process per open conversation. It keeps nothing the
-  app can't resend.
+| Block | What it is |
+|---|---|
+| **app** (`server/app`, `frontend`) | Node + React. Holds settings (license, databases, model key), environments, and **every conversation's pi session entries**. Serves the UI. |
+| **provisioner** (`server/provisioner`) | HTTP service that runs environments. Drivers: `docker` (compose, runs locally), `aws` (ECS Fargate + Bedrock AgentCore, untested). |
+| **agent server** (`images/agent`) | Runs `pi --mode rpc` per conversation, tails pi's session file, streams pi events + entries. Keeps nothing the app can't resend. |
+| **metabase** | Stock image, bootstrapped by a [config file](https://www.metabase.com/docs/latest/configuring-metabase/config-file) (admin, API key, databases) rendered by the app. Needs a Pro/Enterprise token. |
 
-The app calls the provisioner and the agent. Nothing calls the app except the browser.
+The app renders each environment's spec (env + secrets for both services) and hands it to the provisioner; the
+agent never sees database credentials, Metabase never sees the model key. Conversations survive stopping,
+recreating, or moving an environment: the app re-opens them on the agent from its stored entries.
 
-## Provisioner API
+## APIs
 
-Bearer token: the provisioner's own, held by the app.
+**Provisioner** (bearer token)
 
 ```http
-POST /environments
-{ "metabase": { "env": { "MB_REMOTE_SYNC_BRANCH": "feature-x" },
-                "secrets": { "MB_CONFIG_YML": "…", "MB_PREMIUM_EMBEDDING_TOKEN": "…" } },
-  "agent":    { "env": { "PI_PROVIDER": "anthropic", "PI_MODEL": "claude-sonnet-5" },
-                "secrets": { "PI_API_KEY": "…", "MB_API_KEY": "…", "AGENT_TOKEN": "…" },
-                "egress": ["api.anthropic.com"] } }
-→ 201 { "id": "env_7f3a", "state": "starting" }
-
-GET /environments/env_7f3a
-→ 200 { "id": "env_7f3a", "state": "running",
-        "services": { "metabase": "running", "agent": "running" },
-        "endpoints": { "metabase": { "kind": "http", "url": "http://127.0.0.1:4101" },
-                       "agent":    { "kind": "http", "url": "http://127.0.0.1:4102" } } }
-
-GET /environments
-→ 200 { "data": [ { "id": "env_7f3a", "state": "running", … } ] }
-
-PUT /environments/env_7f3a
-{ "metabase": { … }, "agent": { … } }
-→ 202 { "id": "env_7f3a", "state": "starting" }   new spec; a running environment restarts with it
-
-POST   /environments/env_7f3a/stop            → 202 { "state": "stopping" }   keeps Metabase's app DB and /data
-POST   /environments/env_7f3a/start           → 202 { "state": "starting" }
-DELETE /environments/env_7f3a                 → 202   removes everything
-GET    /environments/env_7f3a/logs?service=agent&tail=200 → 200 text/plain
+POST   /environments                 { metabase: {env, secrets}, agent: {env, secrets, egress} } → 201 { id, state }
+GET    /environments[/:id]           → { id, state, services, endpoints: { metabase, agent }, error }
+PUT    /environments/:id             new spec          POST /environments/:id/{start,stop}
+DELETE /environments/:id             GET /environments/:id/logs?service=agent&tail=200
 ```
 
-`POST` creates and starts. `PUT` replaces the spec, the whole of it; a stopped environment keeps the new spec for
-its next `start`. Secrets are write-only and never returned by `GET`. Every write returns at once; the app polls
-`GET` until `state` is `running` or `stopped` (or `error`). The id comes from the provisioner, and the app stores it
-on its environment. The provisioner adds what only it knows: Metabase's app DB, the agent's `MB_URL`, and the egress
-proxy.
+`endpoints.agent` is `{ kind: "http", url }` (docker) or `{ kind: "agentcore", runtimeArn, sessionId }` (aws).
 
-## Agent API
-
-Bearer token: `AGENT_TOKEN` from the spec. Records are pi's own (events, session entries).
+**Agent** (bearer `AGENT_TOKEN`; on AgentCore everything goes through `POST /invocations { method, path, body }`)
 
 ```http
-POST /conversations
-{ "entries": [ { "type": "session", "version": 3, … }, { "type": "message", "id": "a1", … } ] }
-→ 201 { "id": "cv_91c2", "state": "idle" }   writes the pi session file and starts pi on it; [] starts a new session
-
-GET /conversations/cv_91c2
-→ 200 { "id": "cv_91c2", "state": "running" }
-
-GET /conversations
-→ 200 { "data": [ { "id": "cv_91c2", "state": "running" } ] }
-
-PUT /conversations/cv_91c2
-{ "entries": [ … ] }
-→ 200 { "id": "cv_91c2", "state": "idle" }   replaces the history; 409 while running
-
-POST /conversations/cv_91c2/prompt  { "message": "Build a revenue dashboard" } → 202 { "state": "running" }
-POST /conversations/cv_91c2/abort                                             → 202
-
-GET /conversations/cv_91c2/events?after=41
-→ 200 text/event-stream
-id: 42
-data: {"kind":"event","event":{"type":"message_update","assistantMessageEvent":{"type":"text_delta","delta":"Sure"}}}
-
-id: 43
-data: {"kind":"entry","entry":{"type":"message","id":"b2","parentId":"a1","message":{"role":"assistant",…}}}
-
-DELETE /conversations/cv_91c2   → 204   stops pi, deletes the session file
-GET    /ping                    → 200 { "status": "Healthy" }
+POST   /conversations                { entries: [pi FileEntry…] } → 201 { id, state, seq }   [] = new session
+GET    /conversations/:id/events?after=<seq>   SSE: {kind:"event", event: pi RPC event} | {kind:"entry", entry}
+POST   /conversations/:id/prompt     { message }       POST /conversations/:id/abort
+PUT    /conversations/:id            replace history   DELETE /conversations/:id    GET /ping
 ```
 
-The id is the agent's handle for an open conversation; the app stores it next to its own conversation. The agent
-closes idle conversations and loses them all on a restart, so any call can answer `404`: the app then `POST`s the
-stored entries again, stores the new id, and retries.
+Unknown conversation → `404`: the app `POST`s its stored entries again and retries.
+
+**App** (browser)
+
+```http
+POST /api/environment { name }       POST /api/environment/:id/{start,stop}     DELETE /api/environment/:id
+POST /api/conversation { environment_id }        POST /api/conversation/:id/prompt { message }
+GET  /api/conversation/:id/events    SSE: first a snapshot of the conversation, then pi events
+```
+
+## Run locally
+
+Needs Node ≥ 22.18, Docker, a Metabase Pro/Enterprise token, and a model API key.
+
+```sh
+npm install
+npm run build:images     # app-agent:dev (pi + mb CLI + agent server), app-proxy:dev (egress allowlist)
+npm run dev              # provisioner :4000, app :3100, UI :3000
+```
+
+Open http://localhost:3000, activate the license, add a database (use `host.docker.internal` for one on your
+machine), connect an AI provider, then create an environment.
+
+| Setup | Environments | Databases |
+|---|---|---|
+| ![Setup](docs/screenshots/setup.jpg) | ![Environments](docs/screenshots/environments.jpg) | ![Database](docs/screenshots/database.jpg) |
+
+## Notes
+
+- Docker driver: each environment is a compose project (`~/.app/provisioner/<id>`); the agent sits on an internal
+  network and reaches only its Metabase and, through a tinyproxy allowlist, the model API.
+- AWS driver: Metabase + Postgres sidecar as a Fargate task behind an ALB host rule, secrets in Secrets Manager; the
+  agent is one AgentCore runtime (this image, `AGENT_MODE=agentcore`, arm64, session storage at `/mnt/data`), one
+  session per environment, configured by the provisioner through `PUT /configure`. The sidecar app DB is ephemeral.
+- The embedded Metabase is signed in by the app (`POST /api/environment/:id/metabase-session`), which works because
+  the app and the environment share a host locally.
+- Metabase `v1.65.0.8-beta` fails its second boot with a config file ("requires a Premium token with the
+  :config-text-file feature"); the default image is `metabase/metabase-enterprise:latest` (v1.63).

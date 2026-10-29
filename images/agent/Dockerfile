@@ -9,7 +9,7 @@ RUN apt-get update \
 RUN npm install -g @earendil-works/pi-coding-agent@1.4.0 @metabase/cli \
  && npm cache clean --force
 
-RUN mkdir -p /data/project /app && chown -R node:node /data /app
+RUN mkdir -p /data/project /mnt/data /app && chown -R node:node /data /mnt/data /app
 USER node
 WORKDIR /data/project
 

@@ -1,7 +1,7 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomBytes, timingSafeEqual } from "node:crypto";
-import { closeSync, mkdirSync, openSync, readSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { type IncomingMessage, type ServerResponse, createServer, request as httpRequest } from "node:http";
 import { join } from "node:path";
 
 import type { FileEntry, JsonAgentSessionEvent } from "@earendil-works/pi-coding-agent";
@@ -16,9 +16,21 @@ import type {
 } from "../../shared/protocol.ts";
 
 const PORT = 8080;
-const PROJECT_DIR = "/data/project";
+const IS_AGENTCORE = process.env.AGENT_MODE === "agentcore";
+const DATA_DIR = IS_AGENTCORE ? "/mnt/data" : "/data";
+const PROJECT_DIR = join(DATA_DIR, "project");
+const CONFIG_FILE = join(DATA_DIR, "config.json");
 const SESSION_DIR = "/tmp/conversations";
 const TOKEN = process.env.AGENT_TOKEN ?? "";
+const LOOPBACK_TOKEN = randomBytes(24).toString("base64url");
+const PROVIDER_KEY_VARS: Record<string, string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+  google: "GEMINI_API_KEY",
+  mistral: "MISTRAL_API_KEY",
+  deepseek: "DEEPSEEK_API_KEY",
+};
 const IDLE_MS = 30 * 60 * 1000;
 const TAIL_INTERVAL_MS = 250;
 const COMMAND_TIMEOUT_MS = 30 * 1000;
@@ -73,21 +85,81 @@ class HttpError extends Error {
   }
 }
 
+let config: Record<string, string> = {};
+
+function setting(name: string): string | undefined {
+  return config[name] ?? process.env[name];
+}
+
 function piEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const [key, value] of Object.entries(config)) {
+    if (key !== "PI_API_KEY" && key !== "AGENT_TOKEN") {
+      env[key] = value;
+    }
+  }
+  const provider = setting("PI_PROVIDER");
+  const apiKey = config.PI_API_KEY;
+  if (provider && apiKey && PROVIDER_KEY_VARS[provider]) {
+    env[PROVIDER_KEY_VARS[provider]] = apiKey;
+  }
   delete env.AGENT_TOKEN;
+  delete env.PI_API_KEY;
   return env;
 }
 
 function piArgs(file: string): string[] {
   const args = ["--mode", "rpc", "--session", file];
-  if (process.env.PI_PROVIDER) {
-    args.push("--provider", process.env.PI_PROVIDER);
+  const provider = setting("PI_PROVIDER");
+  const model = setting("PI_MODEL");
+  if (provider) {
+    args.push("--provider", provider);
   }
-  if (process.env.PI_MODEL) {
-    args.push("--model", process.env.PI_MODEL);
+  if (model) {
+    args.push("--model", model);
   }
   return args;
+}
+
+function agentsMd(mbUrl: string, publicUrl: string): string {
+  return [
+    "# This environment",
+    "",
+    `You work on one Metabase through the \`mb\` CLI, which is already logged in (as an admin, with an API key) at ${mbUrl}.`,
+    "Load the `metabase-cli` skill before using it.",
+    "",
+    `People open this Metabase in their browser at ${publicUrl}. When you link to anything in it (a dashboard, a`,
+    `question, a collection), build the link with that base URL, never with ${mbUrl}.`,
+    "",
+  ].join("\n");
+}
+
+function mbLogin(url: string, apiKey: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("mb", ["auth", "login", "--url", url], { env: piEnv(), stdio: ["pipe", "ignore", "pipe"] });
+    let stderr = "";
+    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")));
+    child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`mb auth login failed: ${stderr.trim()}`))));
+    child.stdin.end(apiKey);
+  });
+}
+
+async function applyConfig(next: Record<string, string>) {
+  const mbUrl = next.MB_URL;
+  const apiKey = next.MB_API_KEY;
+  if (!mbUrl || !apiKey) {
+    throw new HttpError(400, "bad_request", "MB_URL and MB_API_KEY are required");
+  }
+  config = next;
+  mkdirSync(PROJECT_DIR, { recursive: true });
+  writeFileSync(join(PROJECT_DIR, "AGENTS.md"), agentsMd(mbUrl, next.MB_PUBLIC_URL ?? mbUrl));
+  await mbLogin(mbUrl, apiKey);
+}
+
+async function loadSavedConfig() {
+  if (IS_AGENTCORE && Object.keys(config).length === 0 && existsSync(CONFIG_FILE)) {
+    await applyConfig(JSON.parse(readFileSync(CONFIG_FILE, "utf8")) as Record<string, string>);
+  }
 }
 
 type RecordInput = { kind: "event"; event: JsonAgentSessionEvent } | { kind: "entry"; entry: FileEntry };
@@ -322,14 +394,64 @@ function sendJson(res: ServerResponse, status: number, body?: unknown) {
   res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(body));
 }
 
-function isAuthorized(req: IncomingMessage): boolean {
-  if (TOKEN === "") {
+function matchesBearer(req: IncomingMessage, token: string): boolean {
+  if (token === "") {
     return false;
   }
-  const header = req.headers.authorization ?? "";
-  const expected = Buffer.from(`Bearer ${TOKEN}`);
-  const actual = Buffer.from(header);
+  const expected = Buffer.from(`Bearer ${token}`);
+  const actual = Buffer.from(req.headers.authorization ?? "");
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function isAuthorized(req: IncomingMessage): boolean {
+  return matchesBearer(req, TOKEN) || matchesBearer(req, LOOPBACK_TOKEN);
+}
+
+type Invocation = {
+  method?: string;
+  path?: string;
+  body?: unknown;
+};
+
+async function invoke(req: IncomingMessage, res: ServerResponse) {
+  const invocation = await readJson<Invocation>(req);
+  const path = typeof invocation.path === "string" && invocation.path.startsWith("/") ? invocation.path : null;
+  if (!path || path.startsWith("/invocations")) {
+    throw new HttpError(400, "bad_request", "An invocation needs a path");
+  }
+  const body = invocation.body === undefined ? undefined : JSON.stringify(invocation.body);
+  const upstream = httpRequest({
+    host: "127.0.0.1",
+    port: PORT,
+    path,
+    method: invocation.method ?? "GET",
+    headers: {
+      Authorization: `Bearer ${LOOPBACK_TOKEN}`,
+      ...(body === undefined ? {} : { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }),
+    },
+  });
+  upstream.on("response", (response) => {
+    if ((response.headers["content-type"] ?? "").includes("text/event-stream")) {
+      res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+      response.pipe(res);
+      req.on("close", () => response.destroy());
+      return;
+    }
+    const chunks: Buffer[] = [];
+    response.on("data", (chunk: Buffer) => chunks.push(chunk));
+    response.on("end", () => {
+      const text = Buffer.concat(chunks).toString("utf8");
+      let parsed: unknown = null;
+      try {
+        parsed = text === "" ? null : JSON.parse(text);
+      } catch {
+        parsed = text;
+      }
+      sendJson(res, 200, { status: response.statusCode ?? 500, body: parsed });
+    });
+  });
+  upstream.on("error", (error) => sendJson(res, 200, { status: 502, body: { code: "agent_error", message: error.message } }));
+  upstream.end(body);
 }
 
 function streamEvents(req: IncomingMessage, res: ServerResponse, conversation: Conversation, after: number) {
@@ -372,9 +494,23 @@ async function route(req: IncomingMessage, res: ServerResponse) {
     sendJson(res, 200, { status: busy ? "HealthyBusy" : "Healthy" });
     return;
   }
+  if (IS_AGENTCORE && method === "POST" && url.pathname === "/invocations") {
+    await invoke(req, res);
+    return;
+  }
   if (!isAuthorized(req)) {
     throw new HttpError(401, "unauthorized", "Missing or wrong bearer token");
   }
+  if (IS_AGENTCORE && method === "PUT" && url.pathname === "/configure") {
+    const body = await readJson<{ env?: Record<string, string> }>(req);
+    const next = Object.fromEntries(Object.entries(body.env ?? {}).map(([key, value]) => [key, String(value)]));
+    await applyConfig(next);
+    mkdirSync(DATA_DIR, { recursive: true });
+    writeFileSync(CONFIG_FILE, JSON.stringify(next), { mode: 0o600 });
+    sendJson(res, 204);
+    return;
+  }
+  await loadSavedConfig();
   if (parts[0] !== "conversations") {
     throw new HttpError(404, "not_found", "No such route");
   }

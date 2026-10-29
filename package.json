@@ -15,6 +15,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "3.1159.0",
+    "@aws-sdk/client-cloudwatch-logs": "3.1159.0",
+    "@aws-sdk/client-ecs": "3.1159.0",
+    "@aws-sdk/client-elastic-load-balancing-v2": "3.1159.0",
+    "@aws-sdk/client-secrets-manager": "3.1159.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@fontsource/lato": "^5.2.5",

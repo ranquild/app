@@ -11,7 +11,7 @@ import {
 } from "../../shared/conversation.ts";
 import { HttpError, writeEvent } from "../http.ts";
 
-import { AgentClient, UpstreamError } from "./clients.ts";
+import { type Agent, UpstreamError, createAgentClient } from "./clients.ts";
 import type { ConversationRow, EnvironmentRow, Store } from "./db.ts";
 
 const RECONNECT_ATTEMPTS = 5;
@@ -101,14 +101,14 @@ export class Conversations {
     }
   }
 
-  private agentFor(environment: EnvironmentRow): AgentClient {
+  private agentFor(environment: EnvironmentRow): Agent {
     if (environment.status !== "running" || !environment.endpoints) {
       throw new HttpError(409, "conversation_running", "Start the environment first");
     }
-    return new AgentClient(environment.endpoints.agent.url, environment.credentials.agentToken);
+    return createAgentClient(environment.endpoints.agent, environment.credentials.agentToken);
   }
 
-  private async openOnAgent(row: ConversationRow, agent: AgentClient): Promise<{ agentId: string; seq: number }> {
+  private async openOnAgent(row: ConversationRow, agent: Agent): Promise<{ agentId: string; seq: number }> {
     if (row.agentConversationId) {
       try {
         const existing = await agent.get(row.agentConversationId);
@@ -156,7 +156,7 @@ export class Conversations {
   private async relay(
     id: string,
     live: Live,
-    agent: AgentClient,
+    agent: Agent,
     agentId: string,
     startSeq: number,
     upstream: AbortController,

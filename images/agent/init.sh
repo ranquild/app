@@ -3,6 +3,10 @@
 # starts the agent server.
 set -euo pipefail
 
+if [ "${AGENT_MODE:-}" = agentcore ]; then
+  exec node /app/server.ts
+fi
+
 : "${MB_URL:?}" "${MB_API_KEY:?}" "${PI_PROVIDER:?}" "${PI_MODEL:?}" "${PI_API_KEY:?}" "${AGENT_TOKEN:?}"
 
 case "$PI_PROVIDER" in

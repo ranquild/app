@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { EnvironmentSpec, ServiceName, ServiceState } from "../../shared/protocol.ts";
+import type { EnvironmentSpec, ServiceName, ServiceState } from "../../../shared/protocol.ts";
 
 export type Images = {
   metabase: string;

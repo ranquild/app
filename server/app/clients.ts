@@ -1,6 +1,7 @@
 import type { FileEntry } from "../../shared/conversation.ts";
 import type {
   AgentConversation,
+  AgentEndpoint,
   AgentRecord,
   EnvironmentSpec,
   ErrorBody,
@@ -8,16 +9,13 @@ import type {
 } from "../../shared/protocol.ts";
 import { HttpError, readEventStream } from "../http.ts";
 
-export class UpstreamError extends Error {
-  readonly status: number;
+import { AgentCoreAgentClient } from "./agentcore-client.ts";
+import { UpstreamError } from "./errors.ts";
 
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
+export { UpstreamError };
 
-function parseErrorMessage(text: string): string {
+
+export function parseErrorMessage(text: string): string {
   try {
     return (JSON.parse(text) as ErrorBody).message ?? text;
   } catch {
@@ -90,7 +88,16 @@ export class ProvisionerClient {
   }
 }
 
-export class AgentClient {
+export interface Agent {
+  open(entries: FileEntry[]): Promise<AgentConversation>;
+  get(id: string): Promise<AgentConversation>;
+  close(id: string): Promise<void>;
+  prompt(id: string, message: string): Promise<AgentConversation>;
+  abort(id: string): Promise<AgentConversation>;
+  events(id: string, after: number, signal: AbortSignal): AsyncGenerator<AgentRecord>;
+}
+
+export class HttpAgentClient implements Agent {
   private readonly baseUrl: string;
   private readonly token: string;
 
@@ -136,7 +143,7 @@ export class AgentClient {
       throw new UpstreamError(response.status, await response.text());
     }
     try {
-      for await (const { data } of readEventStream(response)) {
+      for await (const { data } of readEventStream(response.body as unknown as AsyncIterable<Uint8Array>)) {
         yield JSON.parse(data) as AgentRecord;
       }
     } catch (error) {
@@ -145,6 +152,13 @@ export class AgentClient {
       }
     }
   }
+}
+
+export function createAgentClient(endpoint: AgentEndpoint, agentToken: string): Agent {
+  if (endpoint.kind === "agentcore") {
+    return new AgentCoreAgentClient(endpoint.runtimeArn, endpoint.sessionId);
+  }
+  return new HttpAgentClient(endpoint.url, agentToken);
 }
 
 export function toHttpError(error: unknown): HttpError {
