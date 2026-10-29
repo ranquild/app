@@ -1,0 +1,42 @@
+.card {
+  margin-bottom: 1rem;
+}
+
+.pending {
+  margin-bottom: 1rem;
+  background-color: var(--mb-color-background_page-secondary);
+  box-shadow: none;
+}
+
+.number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.625rem;
+  height: 1.625rem;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--mb-color-brand);
+  color: var(--mb-color-brand);
+  font-size: 12px;
+  font-weight: 700;
+
+  &[data-pending] {
+    margin-top: 0;
+    border-color: var(--mb-color-border-neutral);
+    color: var(--mb-color-text-disabled);
+  }
+}
+
+.doneBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 50%;
+  background-color: var(--mb-color-success);
+  color: var(--mb-color-text-primary-inverse);
+}

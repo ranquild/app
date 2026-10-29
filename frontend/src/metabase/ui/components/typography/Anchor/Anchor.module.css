@@ -1,0 +1,8 @@
+.root {
+  color: var(--mb-color-core-brand);
+
+  &:active {
+    color: var(--mb-color-text-primary);
+    text-decoration: underline;
+  }
+}

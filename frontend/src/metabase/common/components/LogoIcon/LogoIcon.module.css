@@ -1,0 +1,8 @@
+.logo {
+  display: block;
+  color: var(--mb-color-brand);
+}
+
+.dark {
+  color: var(--mb-color-white, #fff);
+}

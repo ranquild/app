@@ -1,0 +1,7 @@
+.back {
+  color: var(--mb-color-text-secondary);
+
+  &:hover {
+    color: var(--mb-color-text-brand);
+  }
+}

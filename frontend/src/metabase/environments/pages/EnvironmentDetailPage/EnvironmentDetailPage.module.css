@@ -1,0 +1,79 @@
+.page {
+  background-color: var(--mb-color-background_page-primary);
+}
+
+.header {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--mb-color-border-neutral);
+  background-color: var(--mb-color-background_page-primary);
+}
+
+.name {
+  font-family: var(--mb-default-monospace-font-family);
+}
+
+.portPill {
+  font-family: var(--mb-default-monospace-font-family);
+  font-size: 12px;
+  color: var(--mb-color-text-secondary);
+  background-color: var(--mb-color-background_page-tertiary);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--mb-color-text-brand);
+  }
+}
+
+.split {
+  min-height: 0;
+}
+
+.metabasePane {
+  flex: 1 1 58%;
+  min-width: 0;
+}
+
+.metabasePaneHeader {
+  padding: 0.6rem 1rem;
+  flex-shrink: 0;
+}
+
+.metabasePaneHeader {
+  border-bottom: 1px solid var(--mb-color-border-neutral);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+
+  &[data-color="green"] {
+    background-color: var(--mb-color-success);
+  }
+
+  &[data-color="blue"] {
+    background-color: var(--mb-color-brand);
+  }
+}
+
+.frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background-color: transparent;
+}
+
+.signInEmail {
+  font-family: var(--mb-default-monospace-font-family, monospace);
+  font-size: 0.8125rem;
+}
+
+.errorMessage {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 16rem;
+  overflow: auto;
+  margin: 0;
+}

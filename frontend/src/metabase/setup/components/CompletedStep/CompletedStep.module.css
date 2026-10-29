@@ -1,0 +1,22 @@
+.tile {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--mb-color-border-neutral);
+  border-radius: var(--mantine-radius-xs);
+  min-width: 0;
+}
+
+.mono {
+  font-family: var(--mb-default-monospace-font-family);
+}
+
+.doneBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 50%;
+  background-color: var(--mb-color-success);
+  color: var(--mb-color-text-primary-inverse);
+}

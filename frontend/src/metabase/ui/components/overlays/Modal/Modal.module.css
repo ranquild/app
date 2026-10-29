@@ -1,0 +1,42 @@
+.root {
+  color: var(--mb-color-text-primary);
+}
+
+.title {
+  font-size: var(--mantine-font-size-xl);
+  font-weight: var(--mantine-heading-font-weight);
+  line-height: var(--mantine-line-height-md);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.overlay {
+  background-color: var(--mb-color-modal-overlay);
+  padding: 11px;
+}
+
+.content {
+  background-color: var(--mb-color-background_page-primary);
+  border: 1px solid var(--mb-color-border-neutral);
+}
+
+.header {
+  background-color: var(--mb-color-background_page-primary);
+}
+
+.ModalCloseButton {
+  color: var(--mb-color-text-disabled) !important;
+  padding: 0;
+  width: rem(18px);
+  height: rem(18px);
+
+  &:hover {
+    color: var(--mb-color-text-secondary) !important;
+  }
+
+  svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+}

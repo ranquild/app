@@ -1,0 +1,43 @@
+.card {
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+
+  th {
+    text-align: left;
+    padding: 0.875rem 1.25rem;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.45px;
+    text-transform: uppercase;
+    color: var(--mb-color-text-tertiary);
+    border-bottom: 1px solid var(--mb-color-border-neutral);
+  }
+
+  td {
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--mb-color-border-neutral);
+  }
+
+  tbody tr {
+    cursor: pointer;
+
+    &:last-child td {
+      border-bottom: none;
+    }
+
+    &:hover,
+    &:focus-visible {
+      background-color: var(--mb-color-background_surface-hover);
+      outline: none;
+    }
+  }
+}
+
+.mono {
+  font-family: var(--mb-default-monospace-font-family);
+  font-size: 12px;
+}

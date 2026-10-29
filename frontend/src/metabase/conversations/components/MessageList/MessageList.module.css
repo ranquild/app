@@ -1,0 +1,75 @@
+.list {
+  padding: 1rem 1.25rem;
+}
+
+.user {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  background-color: var(--mb-color-background_page-tertiary);
+}
+
+.assistant {
+  max-width: 100%;
+}
+
+.markdown {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.toggle {
+  padding: 0.1rem 0;
+}
+
+.tool {
+  border: 1px solid var(--mb-color-border-neutral);
+  border-radius: 8px;
+  overflow: hidden;
+
+  &[data-error] {
+    border-color: var(--mb-color-error);
+  }
+}
+
+.toolHeader {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+}
+
+.toolName {
+  flex-shrink: 0;
+}
+
+.mono {
+  font-family: var(--mb-default-monospace-font-family, monospace);
+  min-width: 0;
+}
+
+.toolBody {
+  border-top: 1px solid var(--mb-color-border-neutral);
+  background-color: var(--mb-color-background_page-secondary, #f9fbfc);
+}
+
+.code {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--mb-default-monospace-font-family, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 20rem;
+  overflow: auto;
+}
+
+.statusIcon {
+  display: flex;
+  flex-shrink: 0;
+}

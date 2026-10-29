@@ -1,0 +1,100 @@
+.wrapper {
+  --input-height-md: rem(40px);
+  --input-height-xs: rem(32px);
+  --inset-inline-end: 0;
+
+  line-height: 1rem;
+  margin-top: min(
+    var(--input-margin-top, 0px),
+    calc(var(--mantine-spacing-xxs) / 2)
+  );
+  margin-bottom: min(
+    var(--input-margin-bottom, 0px),
+    calc(var(--mantine-spacing-xxs) / 2)
+  );
+}
+
+.input {
+  display: block;
+  color: var(--mb-color-text-primary);
+  border-radius: var(--mantine-radius-xxs);
+  background-color: var(--mb-color-background_page-primary);
+
+  &::placeholder {
+    color: var(--mb-color-text-disabled);
+  }
+
+  &:disabled {
+    background-color: var(--mb-color-background_surface-disabled);
+    color: var(--mb-color-text-disabled);
+  }
+
+  &[data-size="xs"] {
+    font-size: var(--mantine-font-size-sm);
+    line-height: var(--mantine-line-height);
+  }
+
+  &[data-size="md"] {
+    font-size: var(--mantine-font-size-md);
+    line-height: 1.5rem;
+  }
+
+  &[data-variant="default"] {
+    border-color: var(--mb-color-border-neutral);
+
+    &:hover:not(:disabled) {
+      border-color: var(--mb-color-core-brand);
+    }
+
+    &:focus {
+      border-color: var(--mb-color-core-brand);
+    }
+
+    &[data-error] {
+      border-color: var(--mb-color-feedback-negative);
+    }
+  }
+
+  &[data-error] {
+    color: var(--mb-color-feedback-negative);
+    border-color: var(--mb-color-feedback-negative);
+
+    &::placeholder {
+      color: var(--mb-color-feedback-negative);
+    }
+  }
+}
+
+.section {
+  color: var(--mb-color-text-primary);
+}
+
+.label {
+  color: var(--mb-color-text-primary);
+  font-size: var(--mantine-font-size-md);
+  font-weight: bold;
+  line-height: var(--mantine-line-height-md);
+  margin-bottom: var(--mantine-spacing-xxs);
+}
+
+.description {
+  color: var(--mb-color-text-primary);
+  font-size: var(--mantine-font-size-sm);
+  line-height: var(--mantine-line-height-sm);
+  margin-bottom: var(--mantine-spacing-sm);
+}
+
+.error {
+  color: var(--mb-color-feedback-negative);
+  font-size: var(--mantine-font-size-sm);
+  line-height: var(--mantine-line-height-sm);
+  margin-top: var(--mantine-spacing-sm);
+
+  &::first-letter {
+    text-transform: capitalize;
+  }
+}
+
+.required {
+  color: var(--mb-color-feedback-negative);
+}

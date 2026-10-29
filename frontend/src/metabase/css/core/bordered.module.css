@@ -1,0 +1,68 @@
+:root {
+  --border-size: 1px;
+  --border-size-medium: 2px;
+  --border-style: solid;
+  --border-color: var(--mb-color-border-neutral);
+}
+
+.bordered {
+  border: var(--border-size) var(--border-style) var(--mb-color-border-neutral);
+}
+
+.borderBottom {
+  border-bottom: var(--border-size) var(--border-style)
+    var(--mb-color-border-neutral);
+}
+
+/* ensure that a border-top item inside of a bordered element won't double up */
+.bordered > .border-bottom:last-child {
+  border-bottom: none;
+}
+
+.borderTop {
+  border-top: var(--border-size) var(--border-style)
+    var(--mb-color-border-neutral);
+}
+
+/* ensure that a border-top item inside of a bordered element won't double up */
+.bordered > .border-top:first-child {
+  border-top: none;
+}
+
+.borderRowDivider {
+  border-bottom: var(--border-size) var(--border-style)
+    var(--mb-color-border-neutral);
+}
+
+.borderRowDivider:last-child {
+  border-bottom: none;
+}
+
+.borderRight {
+  border-right: var(--border-size) var(--border-style)
+    var(--mb-color-border-neutral);
+}
+
+.borderLeft {
+  border-left: var(--border-size) var(--border-style)
+    var(--mb-color-border-neutral);
+}
+
+.borderSuccess {
+  border-color: var(--mb-color-feedback-positive) !important;
+}
+
+.borderBrand {
+  border-color: var(--mb-color-core-brand) !important;
+}
+
+.borderTransparent {
+  border-color: transparent;
+}
+
+/* BORDERLESS IS THE DEFAULT */
+/* ONLY USE IF needing to override an existing border! */
+/* ensure there is no border via important */
+.borderless {
+  border: none !important;
+}

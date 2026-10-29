@@ -1,0 +1,41 @@
+.SegmentedControl {
+  background-color: var(--sc-background-color);
+}
+
+.SegmentedControlLabel {
+  color: var(--mb-color-text-primary);
+  line-height: 1;
+
+  &:hover {
+    color: var(--mb-color-core-brand);
+  }
+
+  &[data-disabled] {
+    &,
+    &:hover {
+      color: var(--mb-color-text-disabled);
+    }
+  }
+
+  &[data-active] {
+    &,
+    &:hover {
+      color: var(--sc-active-text-color);
+    }
+  }
+}
+
+.SegmentedControl_Control {
+  &:not(:first-of-type) {
+    border-color: var(--mb-color-border-neutral);
+  }
+}
+
+.SegmentedControlInput {
+  &:disabled + label {
+    &,
+    &:hover {
+      color: var(--mb-color-text-disabled);
+    }
+  }
+}
